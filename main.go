@@ -22,13 +22,13 @@ type EC2Config struct {
 func configEC2Instances(batch string) []EC2Config {
 	return []EC2Config{
 		{
-			ImageId:         "ami-0e8849aa060c28662",
-			InstanceType:    "t3.small",
-			KeyName:         "ec2-user",
-			SecurityGroupID: "sg-033a6552e3ffe1a48",
-			SubnetID:        "subnet-0a7e140afbc1f8f9b",
-			TagValue:        batch + "MyFirstInstanceTest1",
-			VolumeSize:      10,
+			ImageId:      "ami-0e8849aa060c28662",
+			InstanceType: "t3.small",
+			//KeyName:         "ec2-user",
+			//SecurityGroupID: "sg-033a6552e3ffe1a48",
+			//SubnetID:        "subnet-0a7e140afbc1f8f9b",
+			TagValue:   batch + "MyFirstInstanceTest1",
+			VolumeSize: 10,
 		},
 	}
 }
@@ -51,13 +51,13 @@ func main() {
 		runResult, err := svc.RunInstances(&ec2.RunInstancesInput{
 			ImageId:      aws.String(config.ImageId),
 			InstanceType: aws.String(config.InstanceType),
-			KeyName:      aws.String(config.KeyName),
+			KeyName:      aws.String("ec2-user"),
 			MinCount:     aws.Int64(1),
 			MaxCount:     aws.Int64(1),
 			SecurityGroupIds: []*string{
-				aws.String(config.SecurityGroupID),
+				aws.String("sg-033a6552e3ffe1a48"),
 			},
-			SubnetId: aws.String(config.SubnetID),
+			SubnetId: aws.String("subnet-0a7e140afbc1f8f9b"),
 			BlockDeviceMappings: []*ec2.BlockDeviceMapping{
 				{
 					DeviceName: aws.String("/dev/sdh"),
