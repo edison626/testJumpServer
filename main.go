@@ -1,12 +1,25 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+)
+
+const (
+	JmsServerURL     = ""                                     // Jumpserver 地址
+	JMSToken         = ""                                     // Jumpserver Token
+	batch            = "b3-"                                  //服务器前缀
+	assetNode        = "e875a0d0-676b-4596-86e5-d83e0e7d262a" // Jumpserver 目录UUID
+	assetNodeDisplay = "/Default/test环境"                      // Jumpserver 路径
 )
 
 type EC2Config struct {
@@ -19,22 +32,115 @@ type EC2Config struct {
 	VolumeSize      int64
 }
 
+type Asset struct {
+	ID           string   `json:"id"`
+	Hostname     string   `json:"hostname"`
+	IP           string   `json:"ip"`
+	Platform     string   `json:"platform"`
+	Protocols    []string `json:"protocols"`
+	Protocol     string   `json:"protocol"`
+	Port         int      `json:"port"`
+	IsActive     bool     `json:"is_active"`
+	PublicIP     string   `json:"public_ip"`
+	Number       string   `json:"number"`
+	Comment      string   `json:"comment"`
+	Vendor       string   `json:"vendor"`
+	Model        string   `json:"model"`
+	SN           string   `json:"sn"`
+	CPUModel     string   `json:"cpu_model"`
+	CPUCount     int      `json:"cpu_count"`
+	CPUCores     int      `json:"cpu_cores"`
+	CPUVcpus     int      `json:"cpu_vcpus"`
+	Memory       string   `json:"memory"`
+	DiskTotal    string   `json:"disk_total"`
+	DiskInfo     string   `json:"disk_info"`
+	OS           string   `json:"os"`
+	OSVersion    string   `json:"os_version"`
+	OSArch       string   `json:"os_arch"`
+	HostnameRaw  string   `json:"hostname_raw"`
+	Domain       string   `json:"domain"`
+	AdminUser    string   `json:"admin_user"`
+	Nodes        []string `json:"nodes"`
+	NodesDisplay []string `json:"nodes_display"`
+	Labels       []string `json:"labels"`
+}
+
 func configEC2Instances(batch string) []EC2Config {
 	return []EC2Config{
 		{
 			ImageId:      "ami-0e8849aa060c28662",
 			InstanceType: "t3.small",
-			//KeyName:         "ec2-user",
-			//SecurityGroupID: "sg-033a6552e3ffe1a48",
-			//SubnetID:        "subnet-0a7e140afbc1f8f9b",
-			TagValue:   batch + "MyFirstInstanceTest1",
-			VolumeSize: 10,
+			TagValue:     batch + "MyFirstInstanceTest1",
+			VolumeSize:   10,
+		},
+		{
+			ImageId:      "ami-0e8849aa060c28662",
+			InstanceType: "t3.small",
+			TagValue:     batch + "MyFirstInstanceTest2",
+			VolumeSize:   10,
 		},
 	}
 }
 
+// CreateNewAsset 发送创建新资产的请求
+func CreateNewAsset(jmsurl, token string, assetClietToken string, assetHostName string, assetIP string) {
+	// 创建资产数据
+	newAsset := Asset{
+		ID:           assetClietToken, //确认是否是UUID 是 ClientToken
+		Hostname:     assetHostName,
+		IP:           assetIP,
+		Platform:     "Linux",
+		Protocols:    []string{"ssh/22"},
+		Protocol:     "ssh",
+		Port:         22,
+		IsActive:     true,
+		PublicIP:     assetIP,
+		AdminUser:    "463fb17d-1257-40ea-8dbd-ddae4ddae199",
+		Nodes:        []string{assetNode},        // 修改目录 UUID
+		NodesDisplay: []string{assetNodeDisplay}, // 修改目录 UUID
+		Labels:       []string{},
+		// 填写其他字段...
+	}
+
+	// 将资产数据转换为 JSON
+	jsonData, err := json.Marshal(newAsset)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 构造 POST 请求
+	url := jmsurl + "/api/v1/assets/assets/"
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 添加必要的头部
+	req.Header.Add("Authorization", "Token "+token)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("X-JMS-ORG", "00000000-0000-0000-0000-000000000002")
+
+	// 发送请求
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(string(body))
+}
+
 func main() {
-	batch := "b3-"
+	if JmsServerURL == "" || JMSToken == "" {
+		log.Fatalf("JmsServerURL and JMSToken must not be empty")
+	}
+
 	configs := configEC2Instances(batch)
 
 	sess, err := session.NewSession(&aws.Config{
@@ -84,6 +190,8 @@ func main() {
 			return
 		}
 
+		fmt.Println("已成功创建实例:", runResult.Instances)
+
 		instanceId := runResult.Instances[0].InstanceId
 
 		// 等待实例变为running状态
@@ -125,5 +233,41 @@ func main() {
 			return
 		}
 		fmt.Println("弹性IP已成功关联到实例:", *instanceId)
+
+		// 获取弹性IP的详细信息
+		describeAddressesOutput, err := svc.DescribeAddresses(&ec2.DescribeAddressesInput{
+			AllocationIds: []*string{allocRes.AllocationId},
+		})
+		if err != nil {
+			fmt.Println("无法获取弹性IP的详细信息:", err)
+			return
+		}
+
+		// 检查是否有返回的地址
+		if len(describeAddressesOutput.Addresses) > 0 {
+			eip := describeAddressesOutput.Addresses[0].PublicIp
+			fmt.Println("关联的弹性IP地址是:", *eip)
+		} else {
+			fmt.Println("未找到弹性IP的详细信息")
+		}
+
+		fmt.Println("~~~~~~~值并配置Jumpserver API~~~~~~~~~~~~")
+		var assetInstanceName string
+		for _, tag := range runResult.Instances[0].Tags {
+			if *tag.Key == "Name" {
+				assetInstanceName = *tag.Value
+				break
+			}
+		}
+
+		fmt.Println("ClientToken:", runResult.Instances[0].ClientToken)
+		fmt.Println("Host Name:", assetInstanceName)
+		fmt.Println("Host IP:", describeAddressesOutput.Addresses[0].PublicIp)
+
+		assetsClientToken := runResult.Instances[0].ClientToken
+		assetIP := describeAddressesOutput.Addresses[0].PublicIp
+
+		CreateNewAsset(JmsServerURL, JMSToken, *assetsClientToken, assetInstanceName, *assetIP)
+
 	}
 }
