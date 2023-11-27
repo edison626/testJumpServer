@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -14,13 +15,13 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
-const (
-	JmsServerURL     = ""                                     // Jumpserver 地址
-	JMSToken         = ""                                     // Jumpserver Token
-	batch            = "b3-"                                  //服务器前缀
-	assetNode        = "e875a0d0-676b-4596-86e5-d83e0e7d262a" // Jumpserver 目录UUID
-	assetNodeDisplay = "/Default/test环境"                      // Jumpserver 路径
-)
+// const (
+// 	JmsServerURL     = ""                                     // Jumpserver 地址
+// 	JMSToken         = ""                                     // Jumpserver Token
+// 	batch            = "b3-"                                  //服务器前缀
+// 	assetNode        = "e875a0d0-676b-4596-86e5-d83e0e7d262a" // Jumpserver 目录UUID
+// 	assetNodeDisplay = "/Default/test环境"                      // Jumpserver 路径
+// )
 
 type EC2Config struct {
 	ImageId         string
@@ -83,7 +84,8 @@ func configEC2Instances(batch string) []EC2Config {
 }
 
 // CreateNewAsset 发送创建新资产的请求
-func CreateNewAsset(jmsurl, token string, assetClietToken string, assetHostName string, assetIP string) {
+func CreateNewAsset(jmsurl, token string, assetClietToken string, assetHostName string,
+	assetIP string, varAssetNote string, varAssetNodeDisplay string) {
 	// 创建资产数据
 	newAsset := Asset{
 		ID:           assetClietToken, //确认是否是UUID 是 ClientToken
@@ -96,8 +98,8 @@ func CreateNewAsset(jmsurl, token string, assetClietToken string, assetHostName 
 		IsActive:     true,
 		PublicIP:     assetIP,
 		AdminUser:    "463fb17d-1257-40ea-8dbd-ddae4ddae199",
-		Nodes:        []string{assetNode},        // 修改目录 UUID
-		NodesDisplay: []string{assetNodeDisplay}, // 修改目录 UUID
+		Nodes:        []string{varAssetNote},        // 修改目录 UUID
+		NodesDisplay: []string{varAssetNodeDisplay}, // 修改目录 UUID
 		Labels:       []string{},
 		// 填写其他字段...
 	}
@@ -137,11 +139,31 @@ func CreateNewAsset(jmsurl, token string, assetClietToken string, assetHostName 
 }
 
 func main() {
-	if JmsServerURL == "" || JMSToken == "" {
-		log.Fatalf("JmsServerURL and JMSToken must not be empty")
+
+	// const (
+	// 	JmsServerURL     = ""                                     // Jumpserver 地址
+	// 	JMSToken         = ""                                     // Jumpserver Token
+	// 	batch            = "b3-"                                  //服务器前缀
+	// 	assetNode        = "e875a0d0-676b-4596-86e5-d83e0e7d262a" // Jumpserver 目录UUID
+	// 	assetNodeDisplay = "/Default/test环境"                      // Jumpserver 路径
+	// )
+
+	varJmsServerURL := os.Getenv("JmsServerURL")
+	fmt.Printf("JmsServerURL : %s\n", varJmsServerURL)
+	varJMSToken := os.Getenv("JMSToken")
+	fmt.Printf("JMSToken : %s\n", varJMSToken)
+	varBatch := os.Getenv("Batch")
+	fmt.Printf("Batch : %s\n", varBatch)
+	varAssetNote := os.Getenv("AssetNote")
+	fmt.Printf("AssetNote : %s\n", varAssetNote)
+	varAssetNodeDisplay := os.Getenv("AssetNodeDisplay")
+	fmt.Printf("AssetNodeDisplay : %s\n", varAssetNodeDisplay)
+
+	if varJmsServerURL == "" || varJMSToken == "" || varBatch == "" || varAssetNote == "" || varAssetNodeDisplay == "" {
+		log.Fatalf("值不能为空")
 	}
 
-	configs := configEC2Instances(batch)
+	configs := configEC2Instances(varBatch)
 
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String("ap-east-1"), // 替换为您的AWS区域
@@ -259,15 +281,14 @@ func main() {
 				break
 			}
 		}
-
-		fmt.Println("ClientToken:", runResult.Instances[0].ClientToken)
-		fmt.Println("Host Name:", assetInstanceName)
-		fmt.Println("Host IP:", describeAddressesOutput.Addresses[0].PublicIp)
-
 		assetsClientToken := runResult.Instances[0].ClientToken
 		assetIP := describeAddressesOutput.Addresses[0].PublicIp
 
-		CreateNewAsset(JmsServerURL, JMSToken, *assetsClientToken, assetInstanceName, *assetIP)
+		fmt.Println("ClientToken:", assetsClientToken)
+		fmt.Println("Host Name:", assetInstanceName)
+		fmt.Println("Host IP:", assetIP)
+
+		CreateNewAsset(varJmsServerURL, varJMSToken, *assetsClientToken, assetInstanceName, *assetIP, varAssetNote, varAssetNodeDisplay)
 
 	}
 }
