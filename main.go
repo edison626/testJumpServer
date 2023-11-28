@@ -18,7 +18,7 @@ import (
 // const (
 // 	JmsServerURL     = ""                                     // Jumpserver 地址
 // 	JMSToken         = ""                                     // Jumpserver Token
-// 	batch            = "b3-"                                  //服务器前缀
+// 	batch            = "b3-"                                  //服务器名前缀
 // 	assetNode        = "e875a0d0-676b-4596-86e5-d83e0e7d262a" // Jumpserver 目录UUID
 // 	assetNodeDisplay = "/Default/test环境"                      // Jumpserver 路径
 // )
@@ -139,24 +139,15 @@ func CreateNewAsset(jmsurl, token string, assetClietToken string, assetHostName 
 }
 
 func main() {
-
-	// const (
-	// 	JmsServerURL     = ""                                     // Jumpserver 地址
-	// 	JMSToken         = ""                                     // Jumpserver Token
-	// 	batch            = "b3-"                                  //服务器前缀
-	// 	assetNode        = "e875a0d0-676b-4596-86e5-d83e0e7d262a" // Jumpserver 目录UUID
-	// 	assetNodeDisplay = "/Default/test环境"                      // Jumpserver 路径
-	// )
-
 	varJmsServerURL := os.Getenv("JmsServerURL")
-	fmt.Printf("JmsServerURL : %s\n", varJmsServerURL)
 	varJMSToken := os.Getenv("JMSToken")
-	fmt.Printf("JMSToken : %s\n", varJMSToken)
 	varBatch := os.Getenv("Batch")
-	fmt.Printf("Batch : %s\n", varBatch)
 	varAssetNote := os.Getenv("AssetNote")
-	fmt.Printf("AssetNote : %s\n", varAssetNote)
 	varAssetNodeDisplay := os.Getenv("AssetNodeDisplay")
+	fmt.Printf("JmsServerURL : %s\n", varJmsServerURL)
+	fmt.Printf("JMSToken : %s\n", varJMSToken)
+	fmt.Printf("Batch : %s\n", varBatch)
+	fmt.Printf("AssetNote : %s\n", varAssetNote)
 	fmt.Printf("AssetNodeDisplay : %s\n", varAssetNodeDisplay)
 
 	if varJmsServerURL == "" || varJMSToken == "" || varBatch == "" || varAssetNote == "" || varAssetNodeDisplay == "" {
